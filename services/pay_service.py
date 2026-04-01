@@ -85,12 +85,12 @@ class PayService:
             )
 
             # Extract cookies from response
-            cookies = resp.cookies
+            # aiohttp cookies is SimpleCookie, iterate with items()
             cookie_str = ""
-            for cookie in cookies:
-                cookie_str += f"{cookie.key}={cookie.value}; "
+            for name, morsel in resp.cookies.items():
+                cookie_str += f"{name}={morsel.value}; "
 
-            self._cookie = cookie_str
+            self._cookie = cookie_str.strip()
             if self._cookie:
                 session.headers["Cookie"] = self._cookie
 
