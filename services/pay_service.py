@@ -94,6 +94,9 @@ class PayService:
             if self._cookie:
                 session.headers["Cookie"] = self._cookie
 
+            # Debug: log what we got
+            logger.info(f"Login response: status={resp.status}, cookie={self._cookie[:80] if self._cookie else 'EMPTY'}")
+
             status = resp.status
             body = await resp.text()
 
@@ -103,12 +106,13 @@ class PayService:
                 return True, "登录成功"
 
             if status == 200:
-                # Check for error messages
-                if "用户名或密码错误" in body or "登录失败" in body:
+                # Check for error messages first
+                if "用户名或密码错误" in body or "登录失败" in body or "error" in body.lower():
                     self._cookie = ""
                     return False, "用户名或密码错误"
 
-                if "success" in body.lower() or "true" in body.lower():
+                # 200 + cookie = success
+                if self._cookie:
                     return True, "登录成功"
 
             return False, f"登录失败 (状态码: {status})"
