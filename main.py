@@ -6,14 +6,15 @@ Features:
 - Query electricity for all configured dorms
 """
 
-from astrbot.api.event import filter, AstrMessageEvent
+from astrbot.api.event import filter, AstrMessageEvent, MessageChain
 from astrbot.api.star import Context, Star, register
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.message_components import MessageChain
 from astrbot.core.utils.session_waiter import session_waiter, SessionController
 from pathlib import Path
 import json
 import asyncio
+
+import astrbot.api.message_components as Comp
 
 from .services import PayService, DormManager, ScheduleManager
 from .services.building_data import (

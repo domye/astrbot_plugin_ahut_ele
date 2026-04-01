@@ -11,7 +11,6 @@ from datetime import datetime, time, timedelta
 from dataclasses import dataclass, field
 from astrbot.api import logger
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
-from astrbot.api.message_components import MessageChain
 
 
 @dataclass
