@@ -105,11 +105,11 @@ def format_campus_menu() -> str:
     for i, (code, name) in enumerate(CAMPUS_OPTIONS.items(), 1):
         lines.append(f"  {i}. {name}")
     lines.append("")
-    lines.append("请输入序号或校区名称（新校区/老校区）：")
+    lines.append("请输入序号或校区名称，或输入'取消'退出：")
     return "\n".join(lines)
 
 
-def format_building_menu(campus: str, page: int = 1, page_size: int = 10) -> str:
+def format_building_menu(campus: str, page: int = 1, page_size: int = 20) -> str:
     """Format building selection menu with pagination."""
     buildings = get_buildings(campus)
     campus_name = CAMPUS_OPTIONS.get(campus, campus)
@@ -127,10 +127,14 @@ def format_building_menu(campus: str, page: int = 1, page_size: int = 10) -> str
         lines.append(f"  {i}. {b.name}")
 
     lines.append("")
+    nav_hints = []
     if page < total_pages:
-        lines.append(f"输入序号选择楼栋，或输入 'n' 查看下一页")
-    else:
-        lines.append("请输入序号选择楼栋：")
+        nav_hints.append("'n'下一页")
+    if page > 1:
+        nav_hints.append("'p'上一页")
+    nav_hints.append("'取消'退出")
+
+    lines.append("输入序号选择楼栋" + (f"，或 {', '.join(nav_hints)}" if nav_hints else ""))
 
     return "\n".join(lines)
 

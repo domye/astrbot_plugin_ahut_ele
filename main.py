@@ -194,38 +194,62 @@ class AhutElePlugin(Star):
         # Step 1: Select campus
         yield event.plain_result(format_campus_menu())
 
+        # Store state for pagination and retry
+        state = {"page": 1, "retry_count": 0}
+        MAX_RETRY = 3
+
         @session_waiter(timeout=120)
         async def campus_session(controller: SessionController, ev: AstrMessageEvent):
-            campus = parse_campus_input(ev.message_str)
+            # Check if this is the original sender
+            if str(ev.get_sender_id()) != sender_id:
+                return  # Ignore messages from other users
+
+            text = ev.message_str.strip()
+
+            # Cancel command
+            if text in ['取消', 'cancel', 'quit', '退出', 'q']:
+                await ev.send(ev.plain_result("已取消设置。"))
+                controller.stop()
+                return
+
+            campus = parse_campus_input(text)
 
             if not campus:
-                await ev.send(ev.plain_result("输入无效，请输入 1 或 2 选择校区："))
+                await ev.send(ev.plain_result("输入无效，请输入 1 或 2 选择校区，或输入'取消'退出："))
                 controller.keep(timeout=120)
                 return
 
             campus_name = CAMPUS_OPTIONS[campus]
 
             # Step 2: Select building
-            await ev.send(ev.plain_result(format_building_menu(campus, page=1)))
+            await ev.send(ev.plain_result(format_building_menu(campus, page=state["page"])))
 
             @session_waiter(timeout=120)
             async def building_session(ctrl: SessionController, e: AstrMessageEvent):
+                # Check sender
+                if str(e.get_sender_id()) != sender_id:
+                    return
+
                 text = e.message_str.strip()
                 buildings = get_buildings(campus)
                 total = len(buildings)
-                page_size = 10
-                total_pages = (total + page_size - 1) // page_size
+
+                # Cancel command
+                if text in ['取消', 'cancel', 'quit', '退出', 'q']:
+                    await e.send(e.plain_result("已取消设置。"))
+                    ctrl.stop()
+                    return
 
                 # Check for pagination
                 if text.lower() == 'n':
-                    # Need to track current page - simplified: always show page 1
-                    # For full pagination, we'd need to track state
-                    await e.send(e.plain_result(format_building_menu(campus, page=1)))
+                    state["page"] = min(state["page"] + 1, (total + 19) // 20)
+                    await e.send(e.plain_result(format_building_menu(campus, page=state["page"])))
                     ctrl.keep(timeout=120)
                     return
 
                 if text.lower() == 'p':
-                    await e.send(e.plain_result(format_building_menu(campus, page=1)))
+                    state["page"] = max(state["page"] - 1, 1)
+                    await e.send(e.plain_result(format_building_menu(campus, page=state["page"])))
                     ctrl.keep(timeout=120)
                     return
 
@@ -239,22 +263,33 @@ class AhutElePlugin(Star):
                         ctrl.keep(timeout=120)
                         return
                 except ValueError:
-                    await e.send(e.plain_result("请输入数字序号选择楼栋："))
+                    await e.send(e.plain_result("请输入数字序号选择楼栋，或输入'取消'退出："))
                     ctrl.keep(timeout=120)
                     return
 
                 # Step 3: Input room number
                 await e.send(e.plain_result(
                     f"已选择：{building.name}\n"
-                    f"请输入房间号（如：101）："
+                    f"请输入房间号（如：101），或输入'取消'退出："
                 ))
 
                 @session_waiter(timeout=120)
                 async def room_session(c: SessionController, evt: AstrMessageEvent):
+                    # Check sender
+                    if str(evt.get_sender_id()) != sender_id:
+                        return
+
                     room_id = evt.message_str.strip()
 
-                    if not room_id:
-                        await evt.send(evt.plain_result("房间号不能为空，请重新输入："))
+                    # Cancel command
+                    if room_id in ['取消', 'cancel', 'quit', '退出', 'q']:
+                        await evt.send(evt.plain_result("已取消设置。"))
+                        c.stop()
+                        return
+
+                    # Validate room number format (must be alphanumeric)
+                    if not room_id or not room_id.replace('-', '').replace('_', '').isalnum():
+                        await evt.send(evt.plain_result("房间号格式错误，请输入数字或字母数字组合（如：101、A101）："))
                         c.keep(timeout=120)
                         return
 
@@ -284,15 +319,21 @@ class AhutElePlugin(Star):
                         await evt.send(evt.plain_result(
                             f"✅ 宿舍设置成功！\n\n{result.format_result()}"
                         ))
+                        c.stop()
                     else:
-                        await evt.send(evt.plain_result(
-                            f"❌ 验证失败：{result.error or '未查询到电费信息'}\n"
-                            "可能是房间号不存在，请重新输入房间号："
-                        ))
-                        c.keep(timeout=120)
-                        return
-
-                    c.stop()
+                        state["retry_count"] += 1
+                        if state["retry_count"] >= MAX_RETRY:
+                            await evt.send(evt.plain_result(
+                                f"验证失败次数过多，请重新执行 /ele_set\n"
+                                f"错误：{result.error or '未查询到电费信息'}"
+                            ))
+                            c.stop()
+                        else:
+                            await evt.send(evt.plain_result(
+                                f"❌ 验证失败：{result.error or '未查询到电费信息'}\n"
+                                f"请重新输入房间号（{MAX_RETRY - state['retry_count']}次机会）："
+                            ))
+                            c.keep(timeout=120)
 
                 try:
                     await room_session(e)
