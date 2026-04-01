@@ -7,7 +7,7 @@ import aiohttp
 import asyncio
 from typing import Optional, Dict, Tuple
 from astrbot.api import logger
-from ..models import IMSResponse
+from ..models import IMSResponse, ElectricityResult
 from .rsa_utils import encrypt_password_with_rsa
 
 
@@ -145,7 +145,7 @@ class PayService:
         building_name: str,
         building_id: str,
         room_id: str,
-        etype: str = "宿舍电费",
+        etype: str = "L",
     ) -> Optional[IMSResponse]:
         """
         Get electricity data for a specific room.
@@ -155,7 +155,7 @@ class PayService:
             building_name: Building name (楼栋名称)
             building_id: Building ID (楼栋ID)
             room_id: Room number (房间号)
-            etype: Electricity type (default: 宿舍电费)
+            etype: Electricity type - 'L' for room, 'K' for AC
 
         Returns: IMSResponse or None if failed
         """
@@ -196,6 +196,50 @@ class PayService:
             logger.error(f"IMS unexpected error: {e}", exc_info=True)
             return None
 
+    async def get_full_electricity(
+        self,
+        campus: str,
+        building_name: str,
+        building_id: str,
+        room_id: str,
+        dorm_name: str = "",
+    ) -> ElectricityResult:
+        """
+        Get both room and AC electricity data.
+
+        Args:
+            campus: Campus name (校区)
+            building_name: Building name (楼栋名称)
+            building_id: Building ID (楼栋ID)
+            room_id: Room number (房间号)
+            dorm_name: Display name for the dorm
+
+        Returns: ElectricityResult with both room and AC data
+        """
+        result = ElectricityResult(dorm_name=dorm_name or f"{building_name} {room_id}")
+
+        try:
+            # Query both room (L) and AC (K) electricity in parallel
+            room_task = self.get_electricity(campus, building_name, building_id, room_id, "L")
+            ac_task = self.get_electricity(campus, building_name, building_id, room_id, "K")
+
+            room_resp, ac_resp = await asyncio.gather(room_task, ac_task)
+
+            if room_resp and room_resp.code == 0:
+                result.room_remain = room_resp.remain_amp
+
+            if ac_resp and ac_resp.code == 0:
+                result.ac_remain = ac_resp.remain_amp
+
+            if not room_resp and not ac_resp:
+                result.error = "查询失败"
+
+        except Exception as e:
+            logger.error(f"Full electricity query error: {e}")
+            result.error = str(e)
+
+        return result
+
     async def query_multiple(self, dorm_configs: list) -> list:
         """
         Query electricity for multiple dorms.
@@ -203,23 +247,22 @@ class PayService:
         Args:
             dorm_configs: List of (sender_id, DormConfig) tuples
 
-        Returns: List of (sender_id, DormConfig, IMSResponse or error_str)
+        Returns: List of (sender_id, DormConfig, ElectricityResult)
         """
         results = []
         for sender_id, dorm in dorm_configs:
             try:
-                ims = await self.get_electricity(
+                result = await self.get_full_electricity(
                     campus=dorm.campus,
                     building_name=dorm.building_name,
                     building_id=dorm.building_id,
                     room_id=dorm.room_id,
+                    dorm_name=dorm.get_display_name(),
                 )
-                if ims:
-                    results.append((sender_id, dorm, ims))
-                else:
-                    results.append((sender_id, dorm, "查询失败"))
+                results.append((sender_id, dorm, result))
             except Exception as e:
                 logger.error(f"Query error for {dorm.room_id}: {e}")
-                results.append((sender_id, dorm, f"错误: {e}"))
+                result = ElectricityResult(dorm_name=dorm.get_display_name(), error=str(e))
+                results.append((sender_id, dorm, result))
 
         return results

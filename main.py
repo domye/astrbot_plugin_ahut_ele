@@ -19,7 +19,7 @@ from .services.building_data import (
     CAMPUS_OPTIONS, get_buildings, get_building_by_id,
     format_campus_menu, format_building_menu, parse_campus_input
 )
-from .models import DormConfig, IMSResponse
+from .models import DormConfig, ElectricityResult
 
 
 @register("ahut_ele", "domye", "安徽工业大学电费查询插件", "1.0.0")
@@ -270,23 +270,23 @@ class AhutElePlugin(Star):
                     # Verify by querying
                     await evt.send(evt.plain_result("正在验证宿舍信息..."))
 
-                    ims = await self.pay_service.get_electricity(
+                    result = await self.pay_service.get_full_electricity(
                         campus=campus,
                         building_name=building.name,
                         building_id=building.id,
                         room_id=room_id,
+                        dorm_name=dorm.get_display_name(),
                     )
 
-                    if ims and ims.code == 0:
+                    if result.room_remain > 0 or result.ac_remain > 0:
                         # Save dorm config
                         await self.dorm_manager.set_dorm(sender_id, dorm)
                         await evt.send(evt.plain_result(
-                            f"✅ 宿舍设置成功！\n\n{ims.format_result(dorm.get_display_name())}"
+                            f"✅ 宿舍设置成功！\n\n{result.format_result()}"
                         ))
                     else:
-                        error_msg = ims.msg if ims else "未知错误"
                         await evt.send(evt.plain_result(
-                            f"❌ 验证失败：{error_msg}\n"
+                            f"❌ 验证失败：{result.error or '未查询到电费信息'}\n"
                             "可能是房间号不存在，请重新输入房间号："
                         ))
                         c.keep(timeout=120)
@@ -368,12 +368,8 @@ class AhutElePlugin(Star):
             # Format results
             lines = ["📊 电费查询结果：", ""]
             for sid, dorm, result in results:
-                if isinstance(result, IMSResponse):
-                    lines.append(result.format_result(dorm.get_display_name()))
-                    lines.append("")
-                else:
-                    lines.append(f"❌ {dorm.get_display_name()}: {result}")
-                    lines.append("")
+                lines.append(result.format_result())
+                lines.append("")
 
             yield event.plain_result("\n".join(lines))
 
@@ -412,17 +408,18 @@ class AhutElePlugin(Star):
         )
 
         try:
-            ims = await self.pay_service.get_electricity(
+            result = await self.pay_service.get_full_electricity(
                 campus=query_dorm.campus,
                 building_name=query_dorm.building_name,
                 building_id=query_dorm.building_id,
                 room_id=query_dorm.room_id,
+                dorm_name=query_dorm.get_display_name(),
             )
 
-            if ims:
-                yield event.plain_result(ims.format_result(query_dorm.get_display_name()))
+            if result.error:
+                yield event.plain_result(f"查询失败：{result.error}")
             else:
-                yield event.plain_result("查询失败，可能是房间号不存在或登录已过期。")
+                yield event.plain_result(result.format_result())
 
         except Exception as e:
             logger.error(f"Query one failed: {e}")

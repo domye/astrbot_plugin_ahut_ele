@@ -26,16 +26,34 @@ class IMSResponse:
             remain_amp=data.get("Data", {}).get("RemainAmp", 0.0),
         )
 
-    def format_result(self, dorm_name: str = "") -> str:
+
+@dataclass
+class ElectricityResult:
+    """Combined electricity result for a dorm."""
+    dorm_name: str
+    room_remain: float = 0.0  # 房间剩余电量
+    ac_remain: float = 0.0    # 空调剩余电量
+    error: str = ""
+
+    def format_result(self) -> str:
         """Format the result for display."""
-        lines = [
-            f"🏠 {dorm_name or self.room_id}",
-            f"⚡ 总电量: {self.all_amp:.2f} kWh",
-            f"📉 已用电: {self.used_amp:.2f} kWh",
-            f"🔋 剩余电量: {self.remain_amp:.2f} kWh",
-        ]
-        if self.remain_amp < 10:
-            lines.append("⚠️ 电量不足，请及时充值！")
+        if self.error:
+            return f"❌ {self.dorm_name}: {self.error}"
+
+        lines = [f"🏠 {self.dorm_name}"]
+        lines.append(f"🔌 房间剩余: {self.room_remain:.2f} kWh")
+        lines.append(f"❄️ 空调剩余: {self.ac_remain:.2f} kWh")
+
+        # Low balance warning
+        warnings = []
+        if self.room_remain < 10:
+            warnings.append("房间电量不足!")
+        if self.ac_remain < 10:
+            warnings.append("空调电量不足!")
+
+        if warnings:
+            lines.append("⚠️ " + " ".join(warnings))
+
         return "\n".join(lines)
 
 
