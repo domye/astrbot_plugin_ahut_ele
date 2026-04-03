@@ -31,12 +31,16 @@ class PayService:
         self._credentials: Optional[Tuple[str, str]] = None  # (username, password)
         self._login_time: Optional[datetime] = None  # Last successful login time
 
+    # Request timeout: 10 seconds per attempt
+    REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=10)
+    # Max retry attempts for electricity query
+    MAX_RETRIES = 3
+
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create HTTP session."""
         if self._session is None or self._session.closed:
-            timeout = aiohttp.ClientTimeout(total=10)
             self._session = aiohttp.ClientSession(
-                timeout=timeout,
+                timeout=self.REQUEST_TIMEOUT,
                 headers={"User-Agent": "AHUT-Ele-AstrBot/1.0"}
             )
         return self._session
@@ -194,36 +198,52 @@ class PayService:
             logger.warning(f"Login required: {message}")
             return None
 
-        try:
-            session = await self._get_session()
+        last_error = None
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                session = await self._get_session()
 
-            form_data = {
-                "xiaoqu": campus,
-                "ld_Name": building_name,
-                "ld_Id": building_id,
-                "Room_No": room_id,
-                "etype": etype,
-            }
+                form_data = {
+                    "xiaoqu": campus,
+                    "ld_Name": building_name,
+                    "ld_Id": building_id,
+                    "Room_No": room_id,
+                    "etype": etype,
+                }
 
-            resp = await session.post(
-                self.IMS_SERVICE_URL,
-                data=form_data,
-                headers={"Referer": self.IMS_URL},
-            )
+                resp = await session.post(
+                    self.IMS_SERVICE_URL,
+                    data=form_data,
+                    headers={"Referer": self.IMS_URL},
+                )
 
-            if resp.status != 200:
-                logger.error(f"IMS request failed: status {resp.status}")
+                if resp.status != 200:
+                    logger.error(f"IMS request failed: status {resp.status}")
+                    return None
+
+                data = await resp.json()
+                return IMSResponse.from_dict(data)
+
+            except asyncio.TimeoutError:
+                last_error = "timeout"
+                logger.warning(f"IMS request timeout (attempt {attempt}/{self.MAX_RETRIES})")
+                if attempt < self.MAX_RETRIES:
+                    # Wait before retry (1s, 2s between attempts)
+                    await asyncio.sleep(attempt)
+                continue
+            except aiohttp.ClientError as e:
+                last_error = f"network: {e}"
+                logger.warning(f"IMS network error (attempt {attempt}/{self.MAX_RETRIES}): {e}")
+                if attempt < self.MAX_RETRIES:
+                    await asyncio.sleep(attempt)
+                continue
+            except Exception as e:
+                logger.error(f"IMS unexpected error: {e}", exc_info=True)
                 return None
 
-            data = await resp.json()
-            return IMSResponse.from_dict(data)
-
-        except aiohttp.ClientError as e:
-            logger.error(f"IMS network error: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"IMS unexpected error: {e}", exc_info=True)
-            return None
+        # All retries exhausted
+        logger.error(f"IMS request failed after {self.MAX_RETRIES} attempts, last error: {last_error}")
+        return None
 
     async def get_full_electricity(
         self,
