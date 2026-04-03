@@ -1,8 +1,8 @@
-"""RSA加密工具 - 用于密码加密
+"""
+RSA加密工具 - 用于密码加密
 
 参考: ahut-tool/backend/utils/RSA.go
 """
-
 import base64
 from typing import Optional
 

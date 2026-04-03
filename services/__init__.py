@@ -1,8 +1,8 @@
-"""Services module for electricity query plugin."""
-
+"""
+Services module
+"""
 from .pay_service import PayService
-from .dorm_manager import DormManager
-from .schedule_manager import ScheduleManager, ScheduleTask
-from . import building_data
+from .building_service import BuildingService, Building
+from .scheduler_service import SchedulerService
 
-__all__ = ["PayService", "DormManager", "ScheduleManager", "ScheduleTask", "building_data"]
+__all__ = ["PayService", "BuildingService", "Building", "SchedulerService"]
