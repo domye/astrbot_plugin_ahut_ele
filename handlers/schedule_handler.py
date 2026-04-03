@@ -22,7 +22,7 @@ class ScheduleHandler(BaseHandler):
             return
 
         if not times:
-            yield event.plain_result("❌ 请提供发送时间，例如：/电费 定时 添加 8:00,20:00")
+            yield event.plain_result("❌ 请提供发送时间，例如：电费 定时 添加 8:00,20:00")
             return
 
         try:
@@ -106,7 +106,7 @@ class ScheduleHandler(BaseHandler):
             return
 
         if not times:
-            yield event.plain_result("❌ 请提供发送时间，例如：/电费 定时 设置 8:00,20:00")
+            yield event.plain_result("❌ 请提供发送时间，例如：电费 定时 设置 8:00,20:00")
             return
 
         try:
@@ -120,7 +120,7 @@ class ScheduleHandler(BaseHandler):
             existing = await self.plugin.scheduler_service.get_task(group_umo)
 
             if not existing:
-                yield event.plain_result("❌ 当前群没有设置定时发送任务，请先使用 /电费 定时 添加")
+                yield event.plain_result("❌ 当前群没有设置定时发送任务，请先使用 电费 定时 添加")
                 return
 
             group_name = group_umo.split(':')[-1] if ':' in group_umo else group_umo

@@ -161,21 +161,21 @@ class UserHandler(BaseHandler):
                 try:
                     await room_session(e)
                 except TimeoutError:
-                    await e.send(e.plain_result("⏱️ 输入超时，请重新执行 /电费 设置"))
+                    await e.send(e.plain_result("⏱️ 输入超时，请重新执行 电费 设置"))
 
                 ctrl.stop()
 
             try:
                 await building_session(ev)
             except TimeoutError:
-                await ev.send(ev.plain_result("⏱️ 输入超时，请重新执行 /电费 设置"))
+                await ev.send(ev.plain_result("⏱️ 输入超时，请重新执行 电费 设置"))
 
             controller.stop()
 
         try:
             await campus_session(event)
         except TimeoutError:
-            yield event.plain_result("⏱️ 输入超时，请重新执行 /电费 设置")
+            yield event.plain_result("⏱️ 输入超时，请重新执行 电费 设置")
         finally:
             event.stop_event()
 
@@ -188,7 +188,7 @@ class UserHandler(BaseHandler):
             if dorm:
                 yield event.plain_result(f"🏠 您设置的宿舍：{dorm.get_display_name()}")
             else:
-                yield event.plain_result("❌ 您还没有设置宿舍信息，请使用 /电费 设置")
+                yield event.plain_result("❌ 您还没有设置宿舍信息，请使用 电费 设置")
         except Exception as e:
             yield event.plain_result(self.handle_error(e, "查询"))
 

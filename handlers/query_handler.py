@@ -27,7 +27,7 @@ class QueryHandler(BaseHandler):
             all_dorms = await self.plugin.dorm_repo.get_all_as_list()
 
             if not all_dorms:
-                yield event.plain_result("❌ 还没有人设置宿舍信息，请先使用 /电费 设置")
+                yield event.plain_result("❌ 还没有人设置宿舍信息，请先使用 电费 设置")
                 return
 
             yield event.plain_result(f"正在查询 {len(all_dorms)} 个宿舍的电费...")
@@ -75,7 +75,7 @@ class QueryHandler(BaseHandler):
         ctx = self.get_user_context(event)
 
         if not room:
-            yield event.plain_result("❌ 请提供房间号，例如：/电费 查询 101")
+            yield event.plain_result("❌ 请提供房间号，例如：电费 查询 101")
             return
 
         try:
@@ -86,7 +86,7 @@ class QueryHandler(BaseHandler):
             # 获取用户宿舍配置
             dorm = await self.plugin.dorm_repo.get(ctx.user_id)
             if not dorm:
-                yield event.plain_result("❌ 您还没有设置宿舍信息，请先使用 /电费 设置")
+                yield event.plain_result("❌ 您还没有设置宿舍信息，请先使用 电费 设置")
                 return
 
             # 使用已存储的校区和楼栋，但查询指定房间

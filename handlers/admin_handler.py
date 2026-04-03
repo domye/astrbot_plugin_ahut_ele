@@ -67,14 +67,14 @@ class AdminHandler(BaseHandler):
             try:
                 await password_session(ev)
             except TimeoutError:
-                await ev.send(ev.plain_result("⏱️ 输入超时，请重新执行 /电费 登录"))
+                await ev.send(ev.plain_result("⏱️ 输入超时，请重新执行 电费 登录"))
 
             controller.stop()
 
         try:
             await login_session(event)
         except TimeoutError:
-            yield event.plain_result("⏱️ 输入超时，请重新执行 /电费 登录")
+            yield event.plain_result("⏱️ 输入超时，请重新执行 电费 登录")
         finally:
             event.stop_event()
 

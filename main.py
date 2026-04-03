@@ -13,7 +13,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import AstrBotConfig, logger
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
-from .core.constants import COMMAND_PREFIX, PLUGIN_NAME
+from .core.constants import COMMAND_PREFIX, PLUGIN_NAME, SESSION_TIMEOUT_MINUTES
 from .core.exceptions import AhutEleException
 from .models.entities import PayCredentials
 from .repositories.credential_repository import CredentialRepository
@@ -117,13 +117,24 @@ class AhutElePlugin(Star):
         except Exception as e:
             logger.error(f"[{PLUGIN_NAME}] 定时查询失败: {e}", exc_info=True)
 
-    # ========== 管理员命令 ==========
+    # ========== 命令入口 ==========
 
-    @filter.command(f"{COMMAND_PREFIX}")
-    async def handle_command(self, event: AstrMessageEvent, subcmd: str = "帮助", *args):
+    @filter.regex(rf'^{COMMAND_PREFIX}')
+    async def handle_command(self, event: AstrMessageEvent):
         """电费命令入口"""
-        subcmd = subcmd.strip()
-        args = list(args) if args else []
+        # 获取完整消息并解析参数
+        full_msg = event.message_str.strip()
+
+        # 移除命令前缀
+        if full_msg.startswith(COMMAND_PREFIX):
+            msg = full_msg[len(COMMAND_PREFIX):].strip()
+        else:
+            msg = ""
+
+        # 解析参数
+        parts = msg.split() if msg else []
+        subcmd = parts[0] if parts else "帮助"
+        args = parts[1:] if len(parts) > 1 else []
 
         if subcmd in ["登录", "login"]:
             async for result in self.admin_handler.handle_login(event):
@@ -167,11 +178,13 @@ class AhutElePlugin(Star):
             else:
                 yield event.plain_result("❌ 未知的定时任务命令")
         elif subcmd in ["状态", "status", "st"]:
-            await self._handle_status(event)
+            async for result in self._handle_status(event):
+                yield result
         elif subcmd in ["帮助", "help", "h"]:
-            await self._handle_help(event)
+            async for result in self._handle_help(event):
+                yield result
         else:
-            yield event.plain_result(f"❌ 未知命令：{subcmd}\n请使用 /{COMMAND_PREFIX} 帮助 查看可用命令")
+            yield event.plain_result(f"❌ 未知命令：{subcmd}\n请使用 {COMMAND_PREFIX} 帮助 查看可用命令")
 
     async def _handle_status(self, event: AstrMessageEvent):
         """查看状态"""
@@ -187,7 +200,6 @@ class AhutElePlugin(Star):
         session_info = "未登录"
         if has_session and self.pay_service._session_info:
             elapsed = datetime.now() - self.pay_service._session_info.login_time
-            from ..core.constants import SESSION_TIMEOUT_MINUTES
             remaining = SESSION_TIMEOUT_MINUTES * 60 - elapsed.total_seconds()
             if remaining > 0:
                 session_info = f"已登录 (剩余 {int(remaining // 60)} 分钟)"
@@ -224,28 +236,28 @@ class AhutElePlugin(Star):
         if is_admin:
             lines.extend([
                 "【管理员命令】",
-                f"/{COMMAND_PREFIX} 登录 - 设置缴费系统登录",
-                f"/{COMMAND_PREFIX} 登出 - 清除登录信息",
-                f"/{COMMAND_PREFIX} 定时 添加 <时间> - 添加定时发送",
-                f"/{COMMAND_PREFIX} 定时 列表 - 查看定时任务",
-                f"/{COMMAND_PREFIX} 定时 删除 - 删除当前群定时任务",
-                f"/{COMMAND_PREFIX} 定时 设置 <时间> - 修改定时时间",
+                f"{COMMAND_PREFIX} 登录 - 设置缴费系统登录",
+                f"{COMMAND_PREFIX} 登出 - 清除登录信息",
+                f"{COMMAND_PREFIX} 定时 添加 <时间> - 添加定时发送",
+                f"{COMMAND_PREFIX} 定时 列表 - 查看定时任务",
+                f"{COMMAND_PREFIX} 定时 删除 - 删除当前群定时任务",
+                f"{COMMAND_PREFIX} 定时 设置 <时间> - 修改定时时间",
                 "",
             ])
 
         lines.extend([
             "【用户命令】",
-            f"/{COMMAND_PREFIX} 设置 - 交互式设置宿舍",
-            f"/{COMMAND_PREFIX} 我的 - 查看我的宿舍",
-            f"/{COMMAND_PREFIX} 删除 - 删除我的宿舍",
+            f"{COMMAND_PREFIX} 设置 - 交互式设置宿舍",
+            f"{COMMAND_PREFIX} 我的 - 查看我的宿舍",
+            f"{COMMAND_PREFIX} 删除 - 删除我的宿舍",
             "",
             "【查询命令】",
-            f"/{COMMAND_PREFIX} 查询 - 查询所有宿舍电费",
-            f"/{COMMAND_PREFIX} 查询 <房间号> - 查询指定房间",
+            f"{COMMAND_PREFIX} 查询 - 查询所有宿舍电费",
+            f"{COMMAND_PREFIX} 查询 <房间号> - 查询指定房间",
             "",
             "【其他】",
-            f"/{COMMAND_PREFIX} 状态 - 查看插件状态",
-            f"/{COMMAND_PREFIX} 帮助 - 查看此帮助",
+            f"{COMMAND_PREFIX} 状态 - 查看插件状态",
+            f"{COMMAND_PREFIX} 帮助 - 查看此帮助",
         ])
 
         yield event.plain_result("\n".join(lines))

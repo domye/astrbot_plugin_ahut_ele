@@ -1,6 +1,6 @@
 name: ahut_ele
 display_name: AHUT电费查询
 desc: 安徽工业大学电费查询插件，支持管理员设置登录，用户设置宿舍，查询电费信息，定时推送
-version: v2.0.0
+version: v2.0.1
 author: domye
 repo: https://github.com/domye/ahut-ele-astrbot
