@@ -1,9 +1,9 @@
-"""AHUT Electricity Query Plugin for AstrBot.
+"""安徽工业大学电费查询插件
 
-Features:
-- Admin can set pay system login credentials
-- Users can set their dormitory configuration
-- Query electricity for all configured dorms
+功能：
+- 管理员可设置缴费系统登录凭证
+- 用户可设置宿舍信息
+- 查询所有已配置宿舍的电费
 """
 
 from datetime import datetime
@@ -27,51 +27,51 @@ from .models import DormConfig, ElectricityResult
 
 @register("ahut_ele", "domye", "安徽工业大学电费查询插件", "1.0.0")
 class AhutElePlugin(Star):
-    """AHUT electricity query plugin."""
+    """安工大电费查询插件"""
 
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config
 
-        # Services
+        # 服务实例
         self.pay_service = PayService()
         self.dorm_manager = DormManager(self.name)
         self.schedule_manager = ScheduleManager(self.name)
 
-        # Admin users from config
+        # 从配置读取管理员用户
         self.admin_users = config.get("admin_users", [])
 
-        # Credentials storage path
+        # 凭证存储路径
         self._data_path = Path("data/plugin_data") / self.name
 
     async def initialize(self):
-        """Initialize the plugin."""
+        """初始化插件"""
         self._data_path.mkdir(parents=True, exist_ok=True)
 
-        # Initialize dorm manager
+        # 初始化宿舍管理器
         await self.dorm_manager.initialize()
 
-        # Initialize schedule manager
+        # 初始化定时任务管理器
         await self.schedule_manager.initialize()
 
-        # Load stored credentials
+        # 加载已存储的凭证
         await self._load_credentials()
 
-        # Start scheduler
+        # 启动定时任务调度器
         self.schedule_manager.start_scheduler(self._send_scheduled_query)
 
-        logger.info(f"{self.name} initialized")
+        logger.info(f"{self.name} 初始化完成")
 
     async def terminate(self):
-        """Cleanup on shutdown."""
-        # Stop scheduler
+        """插件关闭时清理"""
+        # 停止定时任务调度器
         self.schedule_manager.stop_scheduler()
 
         await self.pay_service.close()
-        logger.info(f"{self.name} terminated")
+        logger.info(f"{self.name} 已终止")
 
     async def _load_credentials(self):
-        """Load stored credentials."""
+        """加载已存储的凭证"""
         creds_file = self._data_path / "credentials.json"
         if creds_file.exists():
             try:
@@ -81,40 +81,40 @@ class AhutElePlugin(Star):
                 password = data.get("password", "")
                 if username and password:
                     self.pay_service.set_credentials(username, password)
-                    logger.info("Loaded stored credentials")
+                    logger.info("已加载存储的凭证")
             except Exception as e:
-                logger.error(f"Failed to load credentials: {e}")
+                logger.error(f"加载凭证失败: {e}")
 
     async def _save_credentials(self, username: str, password: str):
-        """Save credentials to file."""
+        """保存凭证到文件"""
         creds_file = self._data_path / "credentials.json"
         try:
-            # Note: Password is stored locally, not in keyring for simplicity
-            # In production, consider using keyring or encryption
+            # 注意：密码以明文存储在本地，未使用密钥环或加密
+            # 生产环境建议考虑使用密钥环或加密存储
             data = {"username": username, "password": password}
             with open(creds_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f)
-            logger.info("Credentials saved")
+            logger.info("凭证已保存")
         except Exception as e:
-            logger.error(f"Failed to save credentials: {e}")
+            logger.error(f"保存凭证失败: {e}")
 
     async def _clear_credentials(self):
-        """Clear stored credentials."""
+        """清除已存储的凭证"""
         creds_file = self._data_path / "credentials.json"
         if creds_file.exists():
             try:
                 creds_file.unlink()
             except Exception as e:
-                logger.error(f"Failed to delete credentials file: {e}")
+                logger.error(f"删除凭证文件失败: {e}")
 
     def _is_admin(self, sender_id: str) -> bool:
-        """Check if user is admin."""
-        # If no admin configured, first user can become admin
+        """检查用户是否为管理员"""
+        # 如果未配置管理员，则所有人都是管理员
         if not self.admin_users:
             return True
         return sender_id in self.admin_users or str(sender_id) in self.admin_users
 
-    # === Admin Commands ===
+    # === 管理员命令 ===
 
     @filter.command("ele_login")
     async def ele_login(self, event: AstrMessageEvent):
@@ -207,15 +207,15 @@ class AhutElePlugin(Star):
         # Step 1: Select campus
         yield event.plain_result(format_campus_menu())
 
-        # Store state for pagination and retry
+        # 存储分页和重试状态
         state = {"page": 1, "retry_count": 0}
         MAX_RETRY = 3
 
         @session_waiter(timeout=120)
         async def campus_session(controller: SessionController, ev: AstrMessageEvent):
-            # Check if this is the original sender
+            # 检查是否是原始发送者
             if str(ev.get_sender_id()) != sender_id:
-                return  # Ignore messages from other users
+                return  # 忽略其他用户的消息
 
             text = ev.message_str.strip()
 
@@ -239,7 +239,7 @@ class AhutElePlugin(Star):
 
             @session_waiter(timeout=120)
             async def building_session(ctrl: SessionController, e: AstrMessageEvent):
-                # Check sender
+                # 检查发送者
                 if str(e.get_sender_id()) != sender_id:
                     return
 
@@ -247,13 +247,13 @@ class AhutElePlugin(Star):
                 buildings = get_buildings(campus)
                 total = len(buildings)
 
-                # Cancel command
+                # 取消命令
                 if text in ['取消', 'cancel', 'quit', '退出', 'q']:
                     await e.send(e.plain_result("已取消设置。"))
                     ctrl.stop()
                     return
 
-                # Check for pagination
+                # 检查翻页
                 if text.lower() == 'n':
                     state["page"] = min(state["page"] + 1, (total + 19) // 20)
                     await e.send(e.plain_result(format_building_menu(campus, page=state["page"])))
@@ -266,7 +266,7 @@ class AhutElePlugin(Star):
                     ctrl.keep(timeout=120)
                     return
 
-                # Parse building selection
+                # 解析楼栋选择
                 try:
                     num = int(text)
                     if 1 <= num <= total:
@@ -280,7 +280,7 @@ class AhutElePlugin(Star):
                     ctrl.keep(timeout=120)
                     return
 
-                # Step 3: Input room number
+                # 步骤3：输入房间号
                 await e.send(e.plain_result(
                     f"已选择：{building.name}\n"
                     f"请输入房间号（如：101），或输入'取消'退出："
@@ -288,25 +288,25 @@ class AhutElePlugin(Star):
 
                 @session_waiter(timeout=120)
                 async def room_session(c: SessionController, evt: AstrMessageEvent):
-                    # Check sender
+                    # 检查发送者
                     if str(evt.get_sender_id()) != sender_id:
                         return
 
                     room_id = evt.message_str.strip()
 
-                    # Cancel command
+                    # 取消命令
                     if room_id in ['取消', 'cancel', 'quit', '退出', 'q']:
                         await evt.send(evt.plain_result("已取消设置。"))
                         c.stop()
                         return
 
-                    # Validate room number format (must be alphanumeric)
+                    # 验证房间号格式（必须是字母数字组合）
                     if not room_id or not room_id.replace('-', '').replace('_', '').isalnum():
                         await evt.send(evt.plain_result("房间号格式错误，请输入数字或字母数字组合（如：101、A101）："))
                         c.keep(timeout=120)
                         return
 
-                    # Create dorm config
+                    # 创建宿舍配置
                     dorm = DormConfig(
                         campus=campus,
                         building_id=building.id,
@@ -315,7 +315,7 @@ class AhutElePlugin(Star):
                         dorm_name=f"{campus_name} {building.name} {room_id}",
                     )
 
-                    # Verify by querying
+                    # 通过查询验证
                     await evt.send(evt.plain_result("正在验证宿舍信息..."))
 
                     result = await self.pay_service.get_full_electricity(
@@ -327,7 +327,7 @@ class AhutElePlugin(Star):
                     )
 
                     if result.room_remain > 0 or result.ac_remain > 0:
-                        # Save dorm config
+                        # 保存宿舍配置
                         await self.dorm_manager.set_dorm(sender_id, dorm)
                         await evt.send(evt.plain_result(
                             f"✅ 宿舍设置成功！\n\n{result.format_result()}"
@@ -401,25 +401,25 @@ class AhutElePlugin(Star):
         """查询电费。用法: /ele [宿舍号]\n无参数时查询所有已设置的宿舍"""
         sender_id = str(event.get_sender_id())
 
-        # Check if system is configured
+        # 检查系统是否已配置
         if not self.pay_service._credentials:
             yield event.plain_result("系统未配置，请等待管理员设置登录信息。")
             return
 
-        # Get all dorms
+        # 获取所有宿舍
         all_dorms = await self.dorm_manager.get_all_dorms()
 
         if not all_dorms:
             yield event.plain_result("还没有人设置宿舍信息。请先使用 /ele_set 设置。")
             return
 
-        # Query all dorms
+        # 查询所有宿舍
         yield event.plain_result(f"正在查询 {len(all_dorms)} 个宿舍的电费...")
 
         try:
             results = await self.pay_service.query_multiple(all_dorms)
 
-            # Format results
+            # 格式化结果
             lines = ["📊 电费查询结果：", ""]
             for sid, dorm, result in results:
                 lines.append(result.format_result())
@@ -440,19 +440,19 @@ class AhutElePlugin(Star):
             yield event.plain_result("请提供宿舍号，例如：/ele_one 101")
             return
 
-        # Check if system is configured
+        # 检查系统是否已配置
         if not self.pay_service._credentials:
             yield event.plain_result("系统未配置，请等待管理员设置登录信息。")
             return
 
-        # Check if user has dorm set
+        # 检查用户是否已设置宿舍
         dorm = await self.dorm_manager.get_dorm(sender_id)
 
         if not dorm:
             yield event.plain_result("您还没有设置宿舍信息，请先使用 /ele_set 设置。")
             return
 
-        # Use stored dorm config but with provided room number
+        # 使用已存储的宿舍配置，但使用提供的房间号
         query_dorm = DormConfig(
             campus=dorm.campus,
             building_id=dorm.building_id,
@@ -487,12 +487,12 @@ class AhutElePlugin(Star):
         sender_id = str(event.get_sender_id())
         is_admin = self._is_admin(sender_id)
 
-        # Get status
+        # 获取状态
         has_session = self.pay_service.has_session()
         has_credentials = self.pay_service._credentials is not None
         dorm_count = await self.dorm_manager.get_dorm_count()
 
-        # Calculate session remaining time
+        # 计算会话剩余时间
         session_info = "未登录"
         if has_session and self.pay_service._login_time:
             elapsed = datetime.now() - self.pay_service._login_time
@@ -555,23 +555,23 @@ class AhutElePlugin(Star):
     # === Scheduled Task Methods ===
 
     async def _send_scheduled_query(self, group_umo: str):
-        """Send scheduled electricity query to a group."""
-        # Check if system is configured
+        """向群组发送定时电费查询"""
+        # 检查系统是否已配置
         if not self.pay_service._credentials:
-            logger.warning("System not configured, skipping scheduled query")
+            logger.warning("系统未配置，跳过定时查询")
             return
 
-        # Get all dorms
+        # 获取所有宿舍
         all_dorms = await self.dorm_manager.get_all_dorms()
 
         if not all_dorms:
-            logger.info("No dorms configured, skipping scheduled query")
+            logger.info("没有配置宿舍，跳过定时查询")
             return
 
         try:
             results = await self.pay_service.query_multiple(all_dorms)
 
-            # Format results
+            # 格式化结果
             lines = ["📊 定时电费查询结果：", ""]
             for sid, dorm, result in results:
                 lines.append(result.format_result())
@@ -579,15 +579,15 @@ class AhutElePlugin(Star):
 
             message = "\n".join(lines)
 
-            # Send message
+            # 发送消息
             message_chain = MessageChain().message(message)
             await self.context.send_message(group_umo, message_chain)
-            logger.info(f"Sent scheduled query to {group_umo}")
+            logger.info(f"已发送定时查询到 {group_umo}")
 
         except Exception as e:
-            logger.error(f"Scheduled query failed: {e}", exc_info=True)
+            logger.error(f"定时查询失败: {e}", exc_info=True)
 
-    # === Schedule Commands ===
+    # === 定时任务命令 ===
 
     @filter.command("ele_schedule_add")
     async def ele_schedule_add(self, event: AstrMessageEvent, times: str = ""):
@@ -603,18 +603,18 @@ class AhutElePlugin(Star):
             yield event.plain_result("请提供发送时间，例如：/ele_schedule_add 8:00,20:00")
             return
 
-        # Parse times
+        # 解析时间
         parsed_times = self.schedule_manager.parse_times(times)
 
         if not parsed_times:
             yield event.plain_result("时间格式错误，请使用格式如：8:00,20:00")
             return
 
-        # Get group UMO
+        # 获取群组UMO
         group_umo = event.unified_msg_origin
         group_name = group_umo.split(':')[-1] if ':' in group_umo else group_umo
 
-        # Add task
+        # 添加任务
         task = await self.schedule_manager.add_task(group_umo, group_name, parsed_times)
 
         yield event.plain_result(
@@ -681,24 +681,24 @@ class AhutElePlugin(Star):
             yield event.plain_result("请提供发送时间，例如：/ele_schedule_edit 8:00,20:00")
             return
 
-        # Parse times
+        # 解析时间
         parsed_times = self.schedule_manager.parse_times(times)
 
         if not parsed_times:
             yield event.plain_result("时间格式错误，请使用格式如：8:00,20:00")
             return
 
-        # Get group UMO
+        # 获取群组UMO
         group_umo = event.unified_msg_origin
         group_name = group_umo.split(':')[-1] if ':' in group_umo else group_umo
 
-        # Check if task exists
+        # 检查任务是否存在
         existing = await self.schedule_manager.get_task(group_umo)
         if not existing:
             yield event.plain_result("当前群没有设置定时发送任务，请先使用 /ele_schedule_add 添加。")
             return
 
-        # Update task
+        # 更新任务
         task = await self.schedule_manager.add_task(group_umo, group_name, parsed_times)
 
         yield event.plain_result(

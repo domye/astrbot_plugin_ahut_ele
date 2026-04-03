@@ -1,6 +1,6 @@
-"""Scheduled task manager for electricity query plugin.
+"""定时任务管理器 - 电费查询插件
 
-Manages scheduled electricity query tasks for group chats.
+管理群聊的定时电费查询任务
 """
 
 import json
@@ -15,10 +15,10 @@ from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 @dataclass
 class ScheduleTask:
-    """Scheduled task for a group chat."""
-    group_umo: str  # Unified Message Origin for the group
-    group_name: str = ""  # Display name for the group
-    times: List[str] = field(default_factory=list)  # List of times like "8:00", "20:00"
+    """群聊的定时任务"""
+    group_umo: str  # 群组统一消息来源
+    group_name: str = ""  # 群组显示名称
+    times: List[str] = field(default_factory=list)  # 时间列表，如 "8:00", "20:00"
 
     def to_dict(self) -> Dict:
         return {
@@ -38,7 +38,7 @@ class ScheduleTask:
 
 @dataclass
 class ScheduleRegistry:
-    """Registry of all scheduled tasks."""
+    """所有定时任务的注册表"""
     tasks: Dict[str, ScheduleTask] = field(default_factory=dict)  # group_umo -> ScheduleTask
 
     def to_dict(self) -> Dict:
@@ -60,7 +60,7 @@ class ScheduleRegistry:
         )
 
     def add_task(self, group_umo: str, group_name: str, times: List[str]) -> ScheduleTask:
-        """Add or update a scheduled task."""
+        """添加或更新定时任务"""
         task = ScheduleTask(
             group_umo=group_umo,
             group_name=group_name,
@@ -70,23 +70,23 @@ class ScheduleRegistry:
         return task
 
     def get_task(self, group_umo: str) -> Optional[ScheduleTask]:
-        """Get task for a group."""
+        """获取群组的任务"""
         return self.tasks.get(group_umo)
 
     def remove_task(self, group_umo: str) -> bool:
-        """Remove task for a group."""
+        """移除群组的任务"""
         if group_umo in self.tasks:
             del self.tasks[group_umo]
             return True
         return False
 
     def get_all_tasks(self) -> List[ScheduleTask]:
-        """Get all tasks."""
+        """获取所有任务"""
         return list(self.tasks.values())
 
 
 class ScheduleManager:
-    """Manages scheduled electricity query tasks."""
+    """管理定时电费查询任务"""
 
     def __init__(self, plugin_name: str):
         self.plugin_name = plugin_name
@@ -97,15 +97,15 @@ class ScheduleManager:
         self._scheduler_task: Optional[asyncio.Task] = None
 
     async def initialize(self):
-        """Initialize the manager and load existing tasks."""
+        """初始化管理器并加载现有任务"""
         self._data_path = Path(get_astrbot_data_path()) / "plugin_data" / self.plugin_name
         self._data_path.mkdir(parents=True, exist_ok=True)
 
         await self._load_registry()
-        logger.info(f"ScheduleManager initialized with {len(self._registry.tasks)} tasks")
+        logger.info(f"ScheduleManager 已初始化，包含 {len(self._registry.tasks)} 个任务")
 
     async def _load_registry(self):
-        """Load registry from file."""
+        """从文件加载注册表"""
         registry_file = self._data_path / "schedule_tasks.json"
 
         async with self._lock:
@@ -114,15 +114,15 @@ class ScheduleManager:
                     with open(registry_file, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     self._registry = ScheduleRegistry.from_dict(data)
-                    logger.info(f"Loaded {len(self._registry.tasks)} scheduled tasks")
+                    logger.info(f"已加载 {len(self._registry.tasks)} 个定时任务")
                 except Exception as e:
-                    logger.error(f"Failed to load schedule registry: {e}")
+                    logger.error(f"加载定时任务注册表失败: {e}")
                     self._registry = ScheduleRegistry()
             else:
                 self._registry = ScheduleRegistry()
 
     async def _save_registry(self):
-        """Save registry to file."""
+        """保存注册表到文件"""
         if not self._registry:
             return
 
@@ -132,53 +132,53 @@ class ScheduleManager:
             try:
                 with open(registry_file, 'w', encoding='utf-8') as f:
                     json.dump(self._registry.to_dict(), f, ensure_ascii=False, indent=2)
-                logger.debug("Schedule registry saved")
+                logger.debug("定时任务注册表已保存")
             except Exception as e:
-                logger.error(f"Failed to save schedule registry: {e}")
+                logger.error(f"保存定时任务注册表失败: {e}")
 
     async def add_task(self, group_umo: str, group_name: str, times: List[str]) -> ScheduleTask:
-        """Add a scheduled task for a group."""
+        """为群组添加定时任务"""
         if not self._registry:
             await self._load_registry()
 
         task = self._registry.add_task(group_umo, group_name, times)
         await self._save_registry()
-        logger.info(f"Added scheduled task for {group_name}: {times}")
+        logger.info(f"已为 {group_name} 添加定时任务: {times}")
         return task
 
     async def get_task(self, group_umo: str) -> Optional[ScheduleTask]:
-        """Get scheduled task for a group."""
+        """获取群组的定时任务"""
         if not self._registry:
             await self._load_registry()
 
         return self._registry.get_task(group_umo)
 
     async def remove_task(self, group_umo: str) -> bool:
-        """Remove scheduled task for a group."""
+        """移除群组的定时任务"""
         if not self._registry:
             await self._load_registry()
 
         removed = self._registry.remove_task(group_umo)
         if removed:
             await self._save_registry()
-            logger.info(f"Removed scheduled task for {group_umo}")
+            logger.info(f"已移除 {group_umo} 的定时任务")
         return removed
 
     async def get_all_tasks(self) -> List[ScheduleTask]:
-        """Get all scheduled tasks."""
+        """获取所有定时任务"""
         if not self._registry:
             await self._load_registry()
 
         return self._registry.get_all_tasks()
 
     def parse_times(self, time_str: str) -> List[str]:
-        """Parse time string like '8:00,20:00' into list of times."""
+        """解析时间字符串如 '8:00,20:00' 为时间列表"""
         times = []
         for t in time_str.split(','):
             t = t.strip()
-            # Validate time format
+            # 验证时间格式
             try:
-                # Support formats: "8:00", "08:00", "8", "08"
+                # 支持格式: "8:00", "08:00", "8", "08"
                 if ':' in t:
                     hour, minute = t.split(':')
                     hour = int(hour)
@@ -195,31 +195,31 @@ class ScheduleManager:
         return times
 
     def start_scheduler(self, send_callback):
-        """Start the scheduler background task.
+        """启动定时任务后台任务
 
-        Args:
-            send_callback: Async function to call for sending messages.
-                           Signature: async def callback(group_umo: str, message: str)
+        参数:
+            send_callback: 发送消息的异步回调函数
+                          签名: async def callback(group_umo: str, message: str)
         """
         if self._running:
-            logger.warning("Scheduler already running")
+            logger.warning("调度器已在运行")
             return
 
         self._running = True
         self._scheduler_task = asyncio.create_task(self._scheduler_loop(send_callback))
-        logger.info("Scheduler started")
+        logger.info("调度器已启动")
 
     def stop_scheduler(self):
-        """Stop the scheduler background task."""
+        """停止定时任务后台任务"""
         self._running = False
         if self._scheduler_task:
             self._scheduler_task.cancel()
             self._scheduler_task = None
-        logger.info("Scheduler stopped")
+        logger.info("调度器已停止")
 
     async def _scheduler_loop(self, send_callback):
-        """Main scheduler loop that checks and executes tasks."""
-        logger.info("Scheduler loop started")
+        """定时任务主循环，检查并执行任务"""
+        logger.info("调度器循环已启动")
 
         while self._running:
             try:
@@ -227,26 +227,26 @@ class ScheduleManager:
                 current_time = now.strftime("%H:%M")
                 current_minute = now.minute
 
-                # Check every minute at the start of the minute
+                # 每分钟开始时检查
                 tasks = await self.get_all_tasks()
 
                 for task in tasks:
                     if current_time in task.times:
-                        logger.info(f"Executing scheduled task for {task.group_name} at {current_time}")
+                        logger.info(f"在 {current_time} 执行 {task.group_name} 的定时任务")
                         try:
                             await send_callback(task.group_umo)
                         except Exception as e:
-                            logger.error(f"Failed to send scheduled message to {task.group_name}: {e}")
+                            logger.error(f"发送定时消息到 {task.group_name} 失败: {e}")
 
-                # Sleep until next minute
+                # 休眠到下一分钟
                 next_minute = (now.replace(second=0, microsecond=0)
                               + timedelta(minutes=1))
                 sleep_seconds = (next_minute - now).total_seconds()
                 await asyncio.sleep(sleep_seconds)
 
             except asyncio.CancelledError:
-                logger.info("Scheduler loop cancelled")
+                logger.info("调度器循环已取消")
                 break
             except Exception as e:
-                logger.error(f"Scheduler loop error: {e}")
-                await asyncio.sleep(60)  # Wait before retrying
+                logger.error(f"调度器循环错误: {e}")
+                await asyncio.sleep(60)  # 重试前等待

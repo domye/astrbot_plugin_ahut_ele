@@ -1,6 +1,6 @@
-"""Building data for AHUT dormitories.
+"""安工大宿舍楼栋数据
 
-Reference: ahut-tool/frontend/src/components/DormSetting.vue
+参考: ahut-tool/frontend/src/components/DormSetting.vue
 """
 
 from dataclasses import dataclass
@@ -9,18 +9,18 @@ from typing import List, Dict
 
 @dataclass
 class Building:
-    """Building data."""
+    """楼栋数据"""
     id: str
     name: str
 
 
-# Campus options
+# 校区选项
 CAMPUS_OPTIONS = {
     "NewS": "新校区",
     "OldS": "老校区",
 }
 
-# New campus buildings (东校区)
+# 新校区楼栋（东校区）
 NEW_CAMPUS_BUILDINGS = [
     Building("01", "东校区1号学生宿舍楼"),
     Building("02", "东校区2号学生宿舍楼"),
@@ -66,7 +66,7 @@ NEW_CAMPUS_BUILDINGS = [
     Building("43", "东校区N栋北楼宿舍"),
 ]
 
-# Old campus buildings (本部校区)
+# 老校区楼栋（本部校区）
 OLD_CAMPUS_BUILDINGS = [
     Building("01", "本部校区01栋学生宿舍"),
     Building("02", "本部校区02栋学生宿舍"),
@@ -84,14 +84,14 @@ OLD_CAMPUS_BUILDINGS = [
 
 
 def get_buildings(campus: str) -> List[Building]:
-    """Get buildings for a campus."""
+    """获取校区的楼栋列表"""
     if campus == "OldS":
         return OLD_CAMPUS_BUILDINGS
     return NEW_CAMPUS_BUILDINGS
 
 
 def get_building_by_id(campus: str, building_id: str) -> Building:
-    """Get building by ID."""
+    """根据ID获取楼栋"""
     buildings = get_buildings(campus)
     for b in buildings:
         if b.id == building_id:
@@ -100,7 +100,7 @@ def get_building_by_id(campus: str, building_id: str) -> Building:
 
 
 def format_campus_menu() -> str:
-    """Format campus selection menu."""
+    """格式化校区选择菜单"""
     lines = ["🏠 请选择校区：", ""]
     for i, (code, name) in enumerate(CAMPUS_OPTIONS.items(), 1):
         lines.append(f"  {i}. {name}")
@@ -110,7 +110,7 @@ def format_campus_menu() -> str:
 
 
 def format_building_menu(campus: str, page: int = 1, page_size: int = 20) -> str:
-    """Format building selection menu with pagination."""
+    """格式化楼栋选择菜单（带分页）"""
     buildings = get_buildings(campus)
     campus_name = CAMPUS_OPTIONS.get(campus, campus)
 
@@ -140,14 +140,14 @@ def format_building_menu(campus: str, page: int = 1, page_size: int = 20) -> str
 
 
 def parse_campus_input(text: str) -> str:
-    """Parse campus input, return campus code or empty string."""
+    """解析校区输入，返回校区代码或空字符串"""
     text = text.strip()
 
-    # Direct code
+    # 直接代码
     if text in CAMPUS_OPTIONS:
         return text
 
-    # Number input
+    # 数字输入
     try:
         num = int(text)
         if num == 1:
@@ -157,7 +157,7 @@ def parse_campus_input(text: str) -> str:
     except ValueError:
         pass
 
-    # Name match
+    # 名称匹配
     text_lower = text.lower()
     if "新" in text or "东" in text:
         return "NewS"

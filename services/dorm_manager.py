@@ -1,6 +1,6 @@
-"""Dormitory configuration manager.
+"""宿舍配置管理器
 
-Manages user dorm configurations for electricity queries.
+管理用户宿舍配置用于电费查询
 """
 
 import json
@@ -14,7 +14,7 @@ from ..models import DormConfig, UserDormRegistry
 
 
 class DormManager:
-    """Manages dorm configurations for all users."""
+    """管理所有用户的宿舍配置"""
 
     def __init__(self, plugin_name: str):
         self.plugin_name = plugin_name
@@ -23,14 +23,14 @@ class DormManager:
         self._lock = asyncio.Lock()
 
     async def initialize(self):
-        """Initialize the manager and load existing data."""
+        """初始化管理器并加载现有数据"""
         self._data_path = Path(get_astrbot_data_path()) / "plugin_data" / self.plugin_name
         self._data_path.mkdir(parents=True, exist_ok=True)
 
         await self._load_registry()
 
     async def _load_registry(self):
-        """Load registry from file."""
+        """从文件加载注册表"""
         registry_file = self._data_path / "dorm_registry.json"
 
         async with self._lock:
@@ -39,15 +39,15 @@ class DormManager:
                     with open(registry_file, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     self._registry = UserDormRegistry.from_dict(data)
-                    logger.info(f"Loaded {len(self._registry.dorms)} dorm configs")
+                    logger.info(f"已加载 {len(self._registry.dorms)} 个宿舍配置")
                 except Exception as e:
-                    logger.error(f"Failed to load dorm registry: {e}")
+                    logger.error(f"加载宿舍注册表失败: {e}")
                     self._registry = UserDormRegistry()
             else:
                 self._registry = UserDormRegistry()
 
     async def _save_registry(self):
-        """Save registry to file."""
+        """保存注册表到文件"""
         if not self._registry:
             return
 
@@ -57,26 +57,26 @@ class DormManager:
             try:
                 with open(registry_file, 'w', encoding='utf-8') as f:
                     json.dump(self._registry.to_dict(), f, ensure_ascii=False, indent=2)
-                logger.debug("Dorm registry saved")
+                logger.debug("宿舍注册表已保存")
             except Exception as e:
-                logger.error(f"Failed to save dorm registry: {e}")
+                logger.error(f"保存宿舍注册表失败: {e}")
 
     async def set_dorm(self, sender_id: str, dorm: DormConfig) -> bool:
         """
-        Set dorm configuration for a user.
+        设置用户的宿舍配置
 
-        Returns: True if successful
+        返回: 成功返回 True
         """
         if not self._registry:
             await self._load_registry()
 
         self._registry.set_dorm(sender_id, dorm)
         await self._save_registry()
-        logger.info(f"Set dorm for {sender_id}: {dorm.get_display_name()}")
+        logger.info(f"已为 {sender_id} 设置宿舍: {dorm.get_display_name()}")
         return True
 
     async def get_dorm(self, sender_id: str) -> Optional[DormConfig]:
-        """Get dorm configuration for a user."""
+        """获取用户的宿舍配置"""
         if not self._registry:
             await self._load_registry()
 
@@ -84,9 +84,9 @@ class DormManager:
 
     async def remove_dorm(self, sender_id: str) -> bool:
         """
-        Remove dorm configuration for a user.
+        移除用户的宿舍配置
 
-        Returns: True if removed, False if not found
+        返回: 已移除返回 True，未找到返回 False
         """
         if not self._registry:
             await self._load_registry()
@@ -94,18 +94,18 @@ class DormManager:
         removed = self._registry.remove_dorm(sender_id)
         if removed:
             await self._save_registry()
-            logger.info(f"Removed dorm for {sender_id}")
+            logger.info(f"已移除 {sender_id} 的宿舍")
         return removed
 
     async def get_all_dorms(self) -> List[tuple]:
-        """Get all dorm configurations as (sender_id, DormConfig) tuples."""
+        """获取所有宿舍配置，返回 (sender_id, DormConfig) 元组列表"""
         if not self._registry:
             await self._load_registry()
 
         return self._registry.get_all_dorms()
 
     async def get_dorm_count(self) -> int:
-        """Get the number of registered dorms."""
+        """获取已注册宿舍的数量"""
         if not self._registry:
             await self._load_registry()
 
